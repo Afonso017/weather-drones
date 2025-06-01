@@ -1,4 +1,4 @@
-package edu.progdist.entity;
+package edu.progdist.module.drone;
 
 public class EnviromentData {
     // pressão em hPA (hectopascal)
