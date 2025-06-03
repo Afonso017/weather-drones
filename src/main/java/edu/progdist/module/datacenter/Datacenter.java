@@ -57,7 +57,7 @@ public class Datacenter extends Server {
             // agenda requisição multicast a cada 30 segundos
             scheduler.scheduleAtFixedRate(() -> {
                 try {
-                    multicastConnection.send(new Message("DATACENTER_REQUEST",
+                    multicastConnection.send(new Message("MULTICAST_DATACENTER_REQUEST",
                         "Solicitando endereços dos servidores"));
                 } catch (IOException e) {
                     System.err.println("Falha ao enviar multicast: " + e.getMessage());
@@ -75,8 +75,27 @@ public class Datacenter extends Server {
         // trata conexões tcp
         executor.submit(() -> {
             while (true) {
+                // aceita conexões de clientes
                 Socket clientSocket = tcpConnection.accept();
-                executor.submit(() -> tcpConnection.handleClient(clientSocket));
+
+                // cria uma nova tarefa para lidar com o cliente
+                executor.submit(() -> tcpConnection.handleClient(clientSocket, (message) -> {
+                    // verifica tipo da mensagem recebida
+                    switch (message.type()) {
+                        case "USER_REQUEST", "DRONE_REQUEST" -> {   // requisição de usuário ou drone
+                            // verifica se há servidores disponíveis
+                            String payload = serverAddresses.isEmpty()
+                                ? "Nenhum servidor disponível no momento."
+                                : serverAddresses.peek().host();
+                            // retorna o endereço do servidor com menor carga
+                            return new Message("DATACENTER_RESPONSE", payload);
+                        }
+
+                        default -> {
+                            return new Message("DATACENTER_RESPONSE", "");
+                        }
+                    }
+                }));
             }
         });
 

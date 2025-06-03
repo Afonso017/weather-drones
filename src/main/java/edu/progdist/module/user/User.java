@@ -22,13 +22,27 @@ class User {
     }
 
     private void run() {
-        System.out.println("Enviando mensagem de teste...");
+        // envia requisição ao servidor
         try {
-            // Envia uma mensagem de teste
-            tcpConnection.send(new Message("CLIENT_REQUEST", ""));
+            tcpConnection.send(new Message("USER_REQUEST", ""));
             System.out.println("Mensagem enviada com sucesso.");
         } catch (Exception e) {
             System.err.println("Erro ao enviar mensagem: " + e.getMessage());
+        }
+
+        // recebe a resposta do servidor
+        try {
+            Message response = tcpConnection.receive();
+            System.out.println("Resposta recebida do servidor: " + response);
+        } catch (IOException e) {
+            System.err.println("Erro ao receber resposta do servidor: " + e.getMessage());
+        } finally {
+            try {
+                tcpConnection.close();
+                System.out.println("Conexão fechada.");
+            } catch (IOException e) {
+                System.err.println("Erro ao fechar conexão: " + e.getMessage());
+            }
         }
     }
 

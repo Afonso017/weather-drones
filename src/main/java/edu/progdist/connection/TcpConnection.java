@@ -51,7 +51,19 @@ public class TcpConnection implements Connection {
         return serverSocket.accept();
     }
 
-    public void handleClient(Socket clientSocket) {
-
+    public void handleClient(Socket clientSocket, MessageHandler handler) {
+        try (
+            BufferedReader clientIn = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            PrintWriter clientOut = new PrintWriter(clientSocket.getOutputStream(), true)
+        ) {
+            String message;
+            while ((message = clientIn.readLine()) != null) {
+                Message request = new Message(message);
+                Message response = handler.handle(request);
+                clientOut.println(response);
+            }
+        } catch (IOException e) {
+            System.err.println("Erro ao lidar com cliente: " + e.getMessage());
+        }
     }
 }
