@@ -56,11 +56,13 @@ public class Datacenter extends Server {
 
             // agenda requisição multicast a cada 30 segundos
             scheduler.scheduleAtFixedRate(() -> {
-                try {
-                    multicastConnection.send(new Message("MULTICAST_DATACENTER_REQUEST",
-                        "Solicitando endereços dos servidores"));
-                } catch (IOException e) {
-                    System.err.println("Falha ao enviar multicast: " + e.getMessage());
+                if (!multicastConnection.isClosed()) {
+                    try {
+                        multicastConnection.send(new Message("DATACENTER_REQUEST",
+                                "Solicitando endereços dos servidores"));
+                    } catch (IOException e) {
+                        System.err.println("Falha ao enviar multicast: " + e.getMessage());
+                    }
                 }
             }, 0, 30, TimeUnit.SECONDS);
         } catch (IOException e) {
@@ -74,9 +76,11 @@ public class Datacenter extends Server {
     protected void run() {
         // trata conexões tcp
         executor.submit(() -> {
-            while (true) {
+            while (!tcpConnection.isClosed()) {
                 // aceita conexões de clientes
                 Socket clientSocket = tcpConnection.accept();
+
+                if (clientSocket == null) break;
 
                 // cria uma nova tarefa para lidar com o cliente
                 executor.submit(() -> tcpConnection.handleClient(clientSocket, (message) -> {
@@ -85,8 +89,8 @@ public class Datacenter extends Server {
                         case "USER_REQUEST", "DRONE_REQUEST" -> {   // requisição de usuário ou drone
                             // verifica se há servidores disponíveis
                             String payload = serverAddresses.isEmpty()
-                                ? "Nenhum servidor disponível no momento."
-                                : serverAddresses.peek().host();
+                                    ? "Nenhum servidor disponível no momento."
+                                    : serverAddresses.peek().host();
                             // retorna o endereço do servidor com menor carga
                             return new Message("DATACENTER_RESPONSE", payload);
                         }
@@ -101,14 +105,14 @@ public class Datacenter extends Server {
 
         // trata conexões multicast
         executor.submit(() -> {
-            while (true) {
+            while (!multicastConnection.isClosed()) {
                 try {
                     // recebe mensagem do multicast
                     Message message = multicastConnection.receive();
-                    System.out.println("Mensagem recebida do multicast: " + message);
 
                     // processa a mensagem e adiciona o servidor à fila
                     if (message.type().equals("SERVER_RESPONSE")) {
+                        System.out.println("Mensagem recebida do multicast: " + message);
                         String[] parts = message.payload().split(":");
                         String host = parts[0];
                         int workload = Integer.parseInt(parts[1]);
@@ -117,8 +121,6 @@ public class Datacenter extends Server {
                     }
                 } catch (IOException e) {
                     System.err.println("Erro ao processar mensagem do multicast: " + e.getMessage());
-                } catch (Exception e) {
-                    System.err.println("Erro inesperado: " + e.getMessage());
                 }
             }
         });
@@ -132,6 +134,7 @@ public class Datacenter extends Server {
             if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
                 executor.shutdownNow();
             }
+            scheduler.shutdownNow();
             tcpConnection.close();
             multicastConnection.close();
         } catch (IOException e) {

@@ -6,12 +6,14 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 
 public class TcpConnection implements Connection {
     private Socket socket;
     private ServerSocket serverSocket;
     private BufferedReader in;
     private PrintWriter out;
+    private boolean isClosed = false;
 
     public TcpConnection(int port) throws IOException {
         this.serverSocket = new ServerSocket(port);
@@ -45,10 +47,20 @@ public class TcpConnection implements Connection {
         if (serverSocket != null && !serverSocket.isClosed()) {
             serverSocket.close();
         }
+        isClosed = true;
     }
 
-    public Socket accept() throws IOException {
-        return serverSocket.accept();
+    @Override
+    public boolean isClosed() {
+        return isClosed;
+    }
+
+    public Socket accept() {
+        try {
+            return serverSocket.accept();
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     public void handleClient(Socket clientSocket, MessageHandler handler) {

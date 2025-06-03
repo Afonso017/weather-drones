@@ -10,4 +10,5 @@ public interface Connection extends AutoCloseable {
     void send(Message message) throws IOException;
     Message receive() throws IOException;
     void close() throws IOException;
+    boolean isClosed();
 }
