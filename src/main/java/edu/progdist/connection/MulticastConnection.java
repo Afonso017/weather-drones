@@ -31,7 +31,10 @@ public class MulticastConnection implements Connection {
             DatagramPacket pacote = new DatagramPacket(buffer, buffer.length);
             ms.receive(pacote);
             String receivedData = new String(pacote.getData(), 0, pacote.getLength());
-            return new Message(receivedData);
+            Message message = new Message(receivedData);
+            // empacota o endereço e a porta do remetente na mensagem
+            return new Message(pacote.getAddress().getHostAddress() + ":" + pacote.getPort(),
+                message.toString());
         } catch (IOException e) {
             return new Message("", "");
         }
