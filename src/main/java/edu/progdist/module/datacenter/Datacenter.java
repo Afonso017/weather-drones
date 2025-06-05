@@ -156,15 +156,28 @@ public class Datacenter extends Server {
                     // verifica tipo da mensagem recebida
                     switch (message.type()) {
                         case "USER_REQUEST" -> {
+                            // retorna o servidor com menos conexões
                             ServerAddress target = leastConnections();
                             String response = (target != null) ? target.host() : "Nenhum servidor disponível.";
                             return new Message("DATACENTER_RESPONSE", response);
                         }
 
                         case "DRONE_REQUEST" -> {
+                            // encaminha a requisição para o servidor com menos uso de recursos via multicast
                             ServerAddress target = lessResourceUsage();
-                            String response = (target != null) ? target.host() : "Nenhum servidor disponível.";
-                            return new Message("DATACENTER_RESPONSE", response);
+                            if (target != null) {
+                                try {
+                                    multicastConnection.send(new Message("DRONE_REQUEST",
+                                        message.payload()));
+                                    return new Message("DATACENTER_RESPONSE",
+                                        "Requisição encaminhada para o servidor: " + target.serverId);
+                                } catch (IOException e) {
+                                    System.err.println("Erro ao enviar requisição multicast: " + e.getMessage());
+                                    return new Message("DATACENTER_ERROR", "Erro ao encaminhar requisição.");
+                                }
+                            } else {
+                                return new Message("DATACENTER_ERROR", "Nenhum servidor disponível.");
+                            }
                         }
 
                         default -> {

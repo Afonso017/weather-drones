@@ -75,4 +75,10 @@ public class TcpConnection implements Connection {
             }
         } catch (IOException ignored) {}
     }
+
+    public void connect(String host, int port) throws IOException {
+        socket = new Socket(host, port);
+        in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        out = new PrintWriter(socket.getOutputStream(), true);
+    }
 }

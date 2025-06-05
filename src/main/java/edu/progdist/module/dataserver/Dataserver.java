@@ -12,6 +12,7 @@ import java.net.Socket;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.Locale;
+import java.util.Scanner;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -25,8 +26,10 @@ public class Dataserver extends Server {
     private final String serverId;
     private int workload; // carga de trabalho do servidor
     private final DecimalFormat df;
+    private final Host databaseHost;
 
-    public Dataserver() {
+    public Dataserver(Host databaseHost) {
+        this.databaseHost = databaseHost;
         executor = Executors.newCachedThreadPool();
         scheduler = Executors.newScheduledThreadPool(1);
         workload = 0;
@@ -58,6 +61,15 @@ public class Dataserver extends Server {
             multicastConnection = new MulticastConnection("224.6.7.8", 12345);
         } catch (IOException e) {
             System.err.println("Erro ao iniciar conexão multicast: " + e.getMessage());
+            e.printStackTrace(System.err);
+            return;
+        }
+
+        // se conecta ao banco de dados
+        try {
+            tcpConnection.connect(databaseHost.host, databaseHost.port);
+        } catch (IOException e) {
+            System.err.println("Erro ao conectar ao banco de dados: " + e.getMessage());
             e.printStackTrace(System.err);
             return;
         }
@@ -98,14 +110,34 @@ public class Dataserver extends Server {
                     Message message = multicastConnection.receive();    // mensagem com endereço e porta do remetente
                     Message request = new Message(message.payload());   // extrai a mensagem original
 
+                    System.out.println("Mensagem: " + message);
+
                     // envia resposta ao datacenter
-                    if (request.type().equals("DATACENTER_REQUEST")) {
-                        Message response = new Message("SERVER_RESPONSE",
-                            workload + ";" + getResourceUsage() + ";" + serverId);
-                        multicastConnection.send(response);
+                    switch (request.type()) {
+                        case "DATACENTER_REQUEST" -> {
+                            Message response = new Message("SERVER_RESPONSE",
+                                workload + ";" + getResourceUsage() + ";" + serverId);
+                            multicastConnection.send(response);
+                        }
+
+                        case "DRONE_REQUEST" -> {
+                            // trata os dados
+                            String data = request.payload();
+                            System.out.println("Dados recebidos: " + data);
+                            String formattedData = format(data);
+
+                            System.out.println("Dados formatados: " + formattedData);
+
+                            // envia para o banco de dados
+                            Message response = new Message("SAVE_DATA", formattedData);
+                            System.out.println("Enviando dados para o banco de dados: " + response);
+                            tcpConnection.send(response);
+                        }
                     }
                 } catch (IOException e) {
                     System.err.println("Erro ao processar mensagem do multicast: " + e.getMessage());
+                } catch (Exception e) {
+                    System.err.println("Erro inesperado ao processar mensagem do multicast: " + e.getMessage());
                 }
             }
         });
@@ -148,18 +180,18 @@ public class Dataserver extends Server {
         return df.format(resourceUsage); // formata número com 2 casas decimais
     }
 
-    public String formatt(String data) {
+    public String format(String data) {
         if (data == null || data.isEmpty()) {
             return "Error: Invalid Data.";
         }
 
         StringBuilder sb = new StringBuilder(data);
         char[] array = sb.toString().toCharArray();
-        String[] values = new String[4];
+        String[] values = { "", "", "", "" };
         int j = 0;
 
         for (int i = 0; i < sb.length(); i++) {
-            if (Character.isDigit(array[i])) {
+            if (Character.isDigit(array[i]) || array[i] == '.' || (array[i] == '-' && !Character.isDigit(array[i - 1]))) {
                 values[j] = values[j].concat(String.valueOf(array[i]));
             } else if (String.valueOf(array[i]).matches("[-,;#]")) {
                 j++;
@@ -179,7 +211,9 @@ public class Dataserver extends Server {
 
     public static void main(String[] args) {
         try (ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1)) {
-            Dataserver dataserver = new Dataserver();
+            Scanner scanner = new Scanner(System.in);
+            System.out.println("Digite o endereço do banco de dados (host:port):");
+            Dataserver dataserver = new Dataserver(new Host(scanner.nextLine()));
             dataserver.start(8080);
 
             // agenda encerramento do servidor em 3 minutos

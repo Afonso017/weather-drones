@@ -1,6 +1,7 @@
 package edu.progdist.module.drone;
 
 import edu.progdist.connection.Message;
+import edu.progdist.connection.Server;
 import edu.progdist.connection.TcpConnection;
 
 import java.io.IOException;
@@ -83,6 +84,9 @@ public class Drone {
             Scanner scanner = new Scanner(System.in);
             Random random = new Random();
 
+            System.out.println("Digite o endereço do datacenter (host:port):");
+            Server.Host datacenterHost = new Server.Host(scanner.nextLine());
+
             Map<String, DroneConfig> droneConfigs = Map.of(
                 "norte", new DroneConfig("-", null, null),
                 "sul", new DroneConfig(";", "(", ")"),
@@ -113,7 +117,7 @@ public class Drone {
                 scheduler.scheduleAtFixedRate(() -> {
                     try {
                         drone.randomize();
-                        TcpConnection connection = new TcpConnection("localhost", 8080);
+                        TcpConnection connection = new TcpConnection(datacenterHost.host, datacenterHost.port);
                         connection.send(new Message("DRONE_REQUEST", drone.toString()));
                         connection.close();
                     } catch (IOException e) {

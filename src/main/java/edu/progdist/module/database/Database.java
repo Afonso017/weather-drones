@@ -3,7 +3,6 @@ package edu.progdist.module.database;
 import edu.progdist.connection.Message;
 import edu.progdist.connection.Server;
 import edu.progdist.connection.TcpConnection;
-import edu.progdist.module.drone.EnviromentData;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -15,7 +14,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Banco de dados que armazena os dados climáticos.
  */
 public class Database extends Server {
-    private final ConcurrentHashMap<AtomicLong, EnviromentData> storage;
+    private final ConcurrentHashMap<AtomicLong, String> storage;
 
     public Database() {
         storage = new ConcurrentHashMap<>();
@@ -45,21 +44,28 @@ public class Database extends Server {
         executor.submit(() -> {
             while (!tcpConnection.isClosed()) {
                 Socket clientSocket = tcpConnection.accept();
-                if (clientSocket == null) break;
+
+                if (clientSocket == null) {
+                    System.out.println("Conexão fechada pelo cliente.");
+                    break;
+                }
 
                 executor.submit(() -> tcpConnection.handleClient(clientSocket, (message) -> {
                     switch (message.type()) {
-                        case "SAVE_REQUEST" -> {
+                        case "SAVE_DATA" -> {
                             // salva dados climáticos no banco de dados
                             String payload = message.payload();
                             System.out.println("Recebendo dados: " + payload);
-                            // TODO: implementar lógica de salvamento
+                            storage.put(new AtomicLong(System.currentTimeMillis()), payload);
                             return new Message("SAVE_RESPONSE", "Dados salvos com sucesso.");
                         }
 
-                        case "GET_REQUEST" -> {
-                            // TODO: implementar envio dos dados
-                            return new Message("GET_RESPONSE", "Dados não implementados.");
+                        case "GET_DATA" -> {
+                            // retorna dados climáticos armazenados
+                            StringBuilder response = new StringBuilder("Dados armazenados:\n");
+                            storage.forEach((key, value) ->
+                                response.append(key.get()).append(": ").append(value).append("\n"));
+                            return new Message("GET_RESPONSE", response.toString());
                         }
 
                         default -> {
@@ -73,11 +79,16 @@ public class Database extends Server {
 
     @Override
     public void stop() {
-
+        try {
+            tcpConnection.close();
+        } catch (IOException e) {
+            System.err.println("Erro ao fechar conexão do banco de dados: " + e.getMessage());
+            e.printStackTrace(System.err);
+        }
     }
 
     public static void main(String[] args) {
         // inicia servidor do banco de dados
-        Database database = new Database();
+        new Database().start(8080);
     }
 }
