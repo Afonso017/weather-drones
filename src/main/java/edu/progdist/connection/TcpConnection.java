@@ -6,7 +6,6 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.SocketException;
 
 public class TcpConnection implements Connection {
     private Socket socket;
@@ -74,8 +73,6 @@ public class TcpConnection implements Connection {
                 Message response = handler.handle(request);
                 clientOut.println(response);
             }
-        } catch (IOException e) {
-            System.err.println("Erro ao lidar com cliente: " + e.getMessage());
-        }
+        } catch (IOException ignored) {}
     }
 }

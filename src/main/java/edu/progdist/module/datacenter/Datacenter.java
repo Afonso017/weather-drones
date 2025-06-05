@@ -86,13 +86,20 @@ public class Datacenter extends Server {
                 executor.submit(() -> tcpConnection.handleClient(clientSocket, (message) -> {
                     // verifica tipo da mensagem recebida
                     switch (message.type()) {
-                        case "USER_REQUEST", "DRONE_REQUEST" -> {   // requisição de usuário ou drone
+                        case "USER_REQUEST" -> {   // requisição de usuário
                             // verifica se há servidores disponíveis
                             String payload = serverAddresses.isEmpty()
                                     ? "Nenhum servidor disponível no momento."
                                     : serverAddresses.peek().host();
                             // retorna o endereço do servidor com menor carga
                             return new Message("DATACENTER_RESPONSE", payload);
+                        }
+
+                        case "DRONE_REQUEST" -> {  // requisição de drone
+                            // trata os dados
+                            String payload = message.payload();
+                            System.out.println("Recebendo dados do drone: " + payload);
+                            return new Message("DATACENTER_RESPONSE", "Dados do drone processados com sucesso.");
                         }
 
                         default -> {
