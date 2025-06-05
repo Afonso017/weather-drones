@@ -62,6 +62,11 @@ class User {
                 // recebe a resposta do servidor
                 Message dataResponse = tcpConnection.receive();
 
+                if (dataResponse.payload() == null || dataResponse.payload().isEmpty()) {
+                    System.out.println("Nenhum dado recebido do servidor.");
+                    return;
+                }
+
                 if (dataResponse.type().equals("GET_RESPONSE")) {
                     System.out.println("\n\n\nDados climáticos recebidos:");
                     for (String line : dataResponse.payload().split(" ")) {
