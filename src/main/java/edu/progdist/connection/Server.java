@@ -21,6 +21,11 @@ public abstract class Server {
                 this.port = 0;
             }
         }
+
+        @Override
+        public String toString() {
+            return host + (port > 0 ? ":" + port : "");
+        }
     }
 
     protected TcpConnection tcpConnection;                  // trata socket TCP

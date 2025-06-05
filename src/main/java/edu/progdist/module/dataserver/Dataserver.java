@@ -27,6 +27,7 @@ public class Dataserver extends Server {
     private int workload; // carga de trabalho do servidor
     private final DecimalFormat df;
     private final Host databaseHost;
+    private int port;
 
     public Dataserver(Host databaseHost) {
         this.databaseHost = databaseHost;
@@ -55,6 +56,8 @@ public class Dataserver extends Server {
                 System.err.println("Tentando novamente na porta " + (++port) + "...");
             }
         }
+
+        this.port = port; // armazena a porta do servidor
 
         // inicia conexão multicast
         try {
@@ -89,11 +92,31 @@ public class Dataserver extends Server {
 
                 // cria uma nova tarefa para lidar com o cliente
                 executor.submit(() -> tcpConnection.handleClient(clientSocket, (message) -> {
-                    // verifica tipo da mensagem recebida
-                    if (message.type().equals("USER_REQUEST")) { // envia dados do servidor para o usuário
-                        workload++; // incrementa carga de trabalho do servidor
-                        // TODO: implementar lógica de envio de dados para o usuário
-                        return new Message("SERVER_RESPONSE", "");
+                    switch (message.type()) {
+                        case "USER_REQUEST" -> {
+                            workload++; // incrementa carga de trabalho do servidor
+                            return new Message("", "");
+                        }
+
+                        case "DATA_REQUEST" -> {
+                            // envia requisição para o banco de dados
+                            tcpConnection.send(new Message("GET_DATA", ""));
+                            Message dataResponse;
+                            try {
+                                dataResponse = tcpConnection.receive();
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                            return dataResponse;
+                        }
+
+                        case "DATA_RESPONSE" -> {
+                            // recebe dados do banco de dados
+                            String data = message.payload();
+
+                            // envia resposta ao usuário
+                            return new Message("DATA_RESPONSE", data);
+                        }
                     }
 
                     return new Message("DATASERVER_ERROR",
@@ -110,13 +133,11 @@ public class Dataserver extends Server {
                     Message message = multicastConnection.receive();    // mensagem com endereço e porta do remetente
                     Message request = new Message(message.payload());   // extrai a mensagem original
 
-                    System.out.println("Mensagem: " + message);
-
                     // envia resposta ao datacenter
                     switch (request.type()) {
                         case "DATACENTER_REQUEST" -> {
                             Message response = new Message("SERVER_RESPONSE",
-                                workload + ";" + getResourceUsage() + ";" + serverId);
+                                workload + ";" + getResourceUsage() + ";" + serverId + ";" + port);
                             multicastConnection.send(response);
                         }
 
@@ -165,7 +186,6 @@ public class Dataserver extends Server {
         // uso de cpu
         OperatingSystemMXBean os =
             (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
-        double cpuLoad = os.getCpuLoad();
 
         // uso de memória
         long totalMemory = os.getTotalMemorySize();

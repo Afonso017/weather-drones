@@ -6,18 +6,17 @@ import edu.progdist.connection.TcpConnection;
 
 import java.io.IOException;
 import java.net.Socket;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Banco de dados que armazena os dados climáticos.
  */
 public class Database extends Server {
-    private final ConcurrentHashMap<AtomicLong, String> storage;
+    private final ConcurrentLinkedQueue<String> storage;
 
     public Database() {
-        storage = new ConcurrentHashMap<>();
+        storage = new ConcurrentLinkedQueue<>();
         executor = Executors.newCachedThreadPool();
     }
 
@@ -56,15 +55,15 @@ public class Database extends Server {
                             // salva dados climáticos no banco de dados
                             String payload = message.payload();
                             System.out.println("Recebendo dados: " + payload);
-                            storage.put(new AtomicLong(System.currentTimeMillis()), payload);
+                            storage.add(payload);
                             return new Message("SAVE_RESPONSE", "Dados salvos com sucesso.");
                         }
 
                         case "GET_DATA" -> {
                             // retorna dados climáticos armazenados
-                            StringBuilder response = new StringBuilder("Dados armazenados:\n");
-                            storage.forEach((key, value) ->
-                                response.append(key.get()).append(": ").append(value).append("\n"));
+                            StringBuilder response = new StringBuilder();
+                            storage.forEach((value) -> response.append(value).append(" "));
+                            System.out.println("Enviando dados: " + response.toString().replace(" ", "\n"));
                             return new Message("GET_RESPONSE", response.toString());
                         }
 

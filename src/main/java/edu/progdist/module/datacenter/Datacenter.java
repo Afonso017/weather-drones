@@ -20,12 +20,12 @@ public class Datacenter extends Server {
     // record que representa o endereço de um servidor com sua carga de trabalho
     private static class ServerAddress implements Comparable<ServerAddress> {
         private final String serverId;  // ID único do servidor
-        private final String host;      // endereço
+        private final Host host;      // endereço
         private int connectionCount;    // número de conexões ativas
         private double resourceUsage;   // uso de recursos (CPU e RAM)
         private long lastUpdate;        // timestamp em ms
 
-        public ServerAddress(String serverId, String host, double resourceUsage) {
+        public ServerAddress(String serverId, Host host, double resourceUsage) {
             this.serverId = serverId;
             this.host = host;
             this.resourceUsage = resourceUsage;
@@ -43,7 +43,7 @@ public class Datacenter extends Server {
             return lastUpdate;
         }
 
-        public String host() {
+        public Host host() {
             return host;
         }
 
@@ -158,7 +158,7 @@ public class Datacenter extends Server {
                         case "USER_REQUEST" -> {
                             // retorna o servidor com menos conexões
                             ServerAddress target = leastConnections();
-                            String response = (target != null) ? target.host() : "Nenhum servidor disponível.";
+                            String response = (target != null) ? target.host.toString() : "Nenhum servidor disponível.";
                             return new Message("DATACENTER_RESPONSE", response);
                         }
 
@@ -200,15 +200,16 @@ public class Datacenter extends Server {
                     // processa a mensagem e adiciona o servidor à fila
                     if (request.type().equals("SERVER_RESPONSE")) { // extrai informações do payload
                         String[] parts = request.payload().split(";");
-                        if (parts.length < 3) {
+                        if (parts.length < 4) {
                             System.err.println("Payload inválido: " + request.payload());
                             continue;
                         }
 
-                        String host = message.toString().split("\\|")[0]; // endereço do servidor
+                        String host = message.toString().split("\\|")[0].split(":")[0]; // endereço do servidor
                         int workload = Integer.parseInt(parts[0]);  // carga de trabalho do servidor
                         double resourceUsage = Double.parseDouble(parts[1]); // uso de recursos do servidor
                         String serverId = parts[2]; // ID do servidor
+                        int port = Integer.parseInt(parts[3]); // porta do servidor
 
                         // verifica se já existe e atualiza ou adiciona
                         Optional<ServerAddress> existing =
@@ -223,7 +224,7 @@ public class Datacenter extends Server {
                                 " e uso " + resourceUsage);
                         } else {
                             // adiciona novo servidor à fila e ao mapa
-                            ServerAddress addr = new ServerAddress(serverId, host, resourceUsage);
+                            ServerAddress addr = new ServerAddress(serverId, new Host(host + ":" + port), resourceUsage);
                             addr.connectionCount = workload;
                             serverMap.put(serverId, addr);
                             serverAddresses.add(addr);
