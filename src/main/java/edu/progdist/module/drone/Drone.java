@@ -1,130 +1,111 @@
 package edu.progdist.module.drone;
 
-import edu.progdist.connection.Message;
-import edu.progdist.connection.Server;
-import edu.progdist.connection.TcpConnection;
+import org.eclipse.paho.client.mqttv3.*;
+import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function; // <-- MUDANÇA IMPORTANTE
 
+/**
+ * Representa um drone que coleta dados ambientais e os envia para um broker MQTT.
+ * O drone é configurado com uma região específica e envia dados formatados periodicamente.
+ */
 public class Drone {
 
-    // record que representa a configuração usada para instanciar um drone por região
-    private record DroneConfig(String separator, String prefix, String suffix) {}
-
-    private EnviromentData data;
-    private String separator;
     private final String prefix;
-    private final String suffix;
+    private final EnviromentData environmentData = new EnviromentData();
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private MqttClient mqttClient;
 
-    public Drone(String separator, String prefix, String suffix) {
-        this.data = new EnviromentData();
-        this.separator = separator;
-        this.prefix = prefix;
-        this.suffix = suffix;
-    }
+    public Drone(String region, String mqttBroker, Function<EnviromentData, String> dataFormatter) {
+        this.prefix = "[DRONE-" + region + "] ";
+        try {
+            mqttClient = new MqttClient(mqttBroker, MqttClient.generateClientId(), new MemoryPersistence());
+            MqttConnectOptions connOpts = new MqttConnectOptions();
+            connOpts.setCleanSession(true);
+            connOpts.setAutomaticReconnect(true);
+            mqttClient.connect(connOpts);
+            System.out.println(prefix + "Conectado ao broker MQTT.");
 
-    public Drone(int pressao, double radiacao, int temperatura, int umidade,
-                 String separator, String prefix, String suffix) {
-        this.data = new EnviromentData(pressao, radiacao, temperatura, umidade);
-        this.separator = separator;
-        this.prefix = prefix;
-        this.suffix = suffix;
-    }
+            Random random = new Random();
+            scheduler.scheduleAtFixedRate(() -> sendData(dataFormatter), 0, random.nextInt(2, 6),
+                TimeUnit.SECONDS);
 
-    public Drone(EnviromentData data, String separator, String prefix, String suffix) {
-        this.data = new EnviromentData(data);
-        this.separator = separator;
-        this.prefix = prefix;
-        this.suffix = suffix;
-    }
-
-    public EnviromentData getData() {
-        return data;
-    }
-
-    public void setData(EnviromentData data) {
-        this.data = data;
-    }
-
-    public String getSeparator() {
-        return separator;
-    }
-
-    public void setSeparator(String separator) {
-        this.separator = separator;
-    }
-
-    public void randomize() {
-        data.randomize();
-    }
-
-    @Override
-    public String toString() {
-        if (prefix == null) {
-            return data.getPressao() + separator +
-                   data.getRadiacao() + separator +
-                   data.getTemperatura() + separator +
-                   data.getUmidade();
-        } else {
-            return prefix + data.getPressao() + separator +
-                   data.getRadiacao() + separator +
-                   data.getTemperatura() + separator +
-                   data.getUmidade() + suffix;
+        } catch (MqttException e) {
+            System.err.println(prefix + "Erro de conexão: " + e.getMessage());
         }
+    }
+
+    // formata os dados e envia ao broker MQTT
+    private void sendData(Function<EnviromentData, String> dataFormatter) {
+        if (mqttClient == null || !mqttClient.isConnected()) {
+            System.err.println(prefix + "Não conectado, pulando envio de dados.");
+            return;
+        }
+
+        environmentData.randomize();
+
+        String payload = dataFormatter.apply(environmentData);
+
+        MqttMessage message = new MqttMessage(payload.getBytes());
+        message.setQos(0);
+
+        try {
+            System.out.println(prefix + "Enviando: " + payload);
+            String topicRegion = prefix.split("-")[1].replace("] ", "");
+            mqttClient.publish("drones/" + topicRegion, message);
+        } catch (MqttException e) {
+            System.err.println(prefix + "Falhou ao enviar dados: " + e.getMessage());
+        }
+    }
+
+    public void stop() {
+        scheduler.shutdown();
+        try {
+            if (mqttClient != null && mqttClient.isConnected()) {
+                mqttClient.disconnect();
+                mqttClient.close();
+            }
+        } catch (MqttException e) {
+            System.err.println(prefix + "Erro ao fechar o drone: " + e.getMessage());
+        }
+        System.out.println(prefix + "Encerrado.");
     }
 
     public static void main(String[] args) {
-        try (ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(10)) {
+        String region;
+
+        if (args.length < 1) {
             Scanner scanner = new Scanner(System.in);
-            Random random = new Random();
-
-            System.out.println("Digite o endereço do datacenter (host:port):");
-            Server.Host datacenterHost = new Server.Host(scanner.nextLine());
-
-            Map<String, DroneConfig> droneConfigs = Map.of(
-                "norte", new DroneConfig("-", null, null),
-                "sul", new DroneConfig(";", "(", ")"),
-                "leste", new DroneConfig(",", "{", "}"),
-                "oeste", new DroneConfig("#", null, null)
-            );
-
-            while (true) {
-                System.out.println("Digite a direção do drone (norte, sul, leste, oeste) ou 'sair' para encerrar:");
-                String option = scanner.nextLine().toLowerCase();
-
-                if (option.equals("sair")) {
-                    System.out.println("Encerrando simulação...");
-                    scheduler.shutdownNow();
-                    break;
-                }
-
-                if (!droneConfigs.containsKey(option)) {
-                    System.out.println("Opção inválida. Tente novamente.");
-                    continue;
-                }
-
-                DroneConfig config = droneConfigs.get(option);
-                Drone drone = new Drone(config.separator(), config.prefix(), config.suffix());
-
-                int timer = random.nextInt(2, 6); // entre 2 a 5 segundos
-
-                scheduler.scheduleAtFixedRate(() -> {
-                    try {
-                        drone.randomize();
-                        TcpConnection connection = new TcpConnection(datacenterHost.host, datacenterHost.port);
-                        connection.send(new Message("DRONE_REQUEST", drone.toString()));
-                        connection.close();
-                    } catch (IOException e) {
-                        System.err.println("Erro ao conectar ao servidor: " + e.getMessage());
-                    }
-                }, timer, timer, TimeUnit.SECONDS);
-            }
+            System.out.print("Digite a região (norte, sul, leste, oeste): ");
+            region = scanner.nextLine().toLowerCase();
+            scanner.close();
+        } else {
+            region = args[0].toLowerCase();
         }
+
+        final String mqttBroker = "tcp://broker.emqx.io:1883";
+
+        Map<String, Function<EnviromentData, String>> formatters = Map.of(
+            "norte", EnviromentData::toNorthFormat,
+            "sul", EnviromentData::toSouthFormat,
+            "leste", EnviromentData::toEastFormat,
+            "oeste", EnviromentData::toWestFormat
+        );
+
+        Function<EnviromentData, String> formatter = formatters.get(region);
+        if (formatter == null) {
+            System.err.println("Região inválida: " + region);
+            return;
+        }
+
+        Drone drone = new Drone(region, mqttBroker, formatter);
+
+        Runtime.getRuntime().addShutdownHook(new Thread(drone::stop));
     }
 }

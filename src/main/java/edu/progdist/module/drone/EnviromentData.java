@@ -46,35 +46,19 @@ public class EnviromentData {
         this.umidade = 15 + rand.nextInt(70 - 15 + 1);
     }
 
-    public int getPressao() {
-        return pressao;
+    public String toNorthFormat() {
+        return pressao + "-" + radiacao + "-" + temperatura + "-" + umidade;
     }
 
-    public void setPressao(int pressao) {
-        this.pressao = pressao;
+    public String toSouthFormat() {
+        return "(" + pressao + ";" + radiacao + ";" + temperatura + ";" + umidade + ")";
     }
 
-    public double getRadiacao() {
-        return radiacao;
+    public String toEastFormat() {
+        return "{" + pressao + "," + radiacao + "," + temperatura + "," + umidade + "}";
     }
 
-    public void setRadiacao(double radiacao) {
-        this.radiacao = radiacao;
-    }
-
-    public int getTemperatura() {
-        return temperatura;
-    }
-
-    public void setTemperatura(int temperatura) {
-        this.temperatura = temperatura;
-    }
-
-    public int getUmidade() {
-        return umidade;
-    }
-
-    public void setUmidade(int umidade) {
-        this.umidade = umidade;
+    public String toWestFormat() {
+        return pressao + "#" + radiacao + "#" + temperatura + "#" + umidade;
     }
 }

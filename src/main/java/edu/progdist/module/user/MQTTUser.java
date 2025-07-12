@@ -1,0 +1,87 @@
+package edu.progdist.module.user;
+
+import org.eclipse.paho.client.mqttv3.*;
+import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Scanner;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Representa um usuário MQTT que se conecta a um broker e assina um tópico específico.
+ * Recebe mensagens publicadas nesse tópico e as exibe no console, além de armazenar os dados recebidos
+ * para posterior visualização em um dashboard.
+ */
+public class MQTTUser {
+    private MqttClient mqttClient;
+
+    // dados coletados para o dashboard
+    private static final Map<String, List<String>> receivedData = new ConcurrentHashMap<>();
+
+    public MQTTUser(String broker, String topic) {
+        try {
+            mqttClient = new MqttClient(broker, "MQTTUser_" + System.currentTimeMillis(), new MemoryPersistence());
+            MqttConnectOptions connOpts = new MqttConnectOptions();
+            connOpts.setCleanSession(true);
+            mqttClient.connect(connOpts);
+            System.out.println("Conectado. Tópico assinado: " + topic);
+
+            mqttClient.setCallback(new MqttCallback() {
+                @Override
+                public void connectionLost(Throwable cause) {
+                    System.err.println("Conexão perdida. " + cause.getMessage());
+                }
+
+                // formata a mensagem recebida e a adiciona ao mapa de dados coletados
+                @Override
+                public void messageArrived(String topic, MqttMessage message) {
+                    String content = String.format("Região %s: %s%n",
+                        topic.substring(topic.lastIndexOf("/") + 1),
+                        new String(message.getPayload()));
+                    receivedData.computeIfAbsent(topic, k -> new java.util.ArrayList<>()).add(content);
+                    System.out.printf(content);
+                }
+
+                @Override
+                public void deliveryComplete(IMqttDeliveryToken token) {}
+            });
+            mqttClient.subscribe(topic);
+        } catch (MqttException e) {
+            System.err.println("Erro: " + e.getMessage());
+        }
+    }
+
+    public void stop() throws MqttException {
+        if (mqttClient != null && mqttClient.isConnected()) {
+            mqttClient.disconnect();
+            mqttClient.close();
+        }
+
+        System.out.println("Programa encerrado.");
+        Dashboard.display(receivedData);
+    }
+
+    public static void main(String[] args) {
+        String topic;
+
+        // se não houver argumentos, solicita o tópico ao usuário
+        if (args.length < 1) {
+            Scanner scanner = new Scanner(System.in);
+            System.out.print("Digite o tópico MQTT " +
+                "(ex: # para todos ou uma região (norte, sul, leste e oeste): ");
+            topic = "data/realtime/" + scanner.nextLine();
+            scanner.close();
+        } else {
+            topic = args[0];
+        }
+
+        final String mqttBroker = "tcp://broker.emqx.io:1883";
+        MQTTUser user = new MQTTUser(mqttBroker, topic);
+
+        // adiciona um shutdown hook para garantir que o usuário seja desconectado corretamente
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try { user.stop(); } catch (Exception e) { e.printStackTrace(System.err); }
+        }));
+    }
+}
