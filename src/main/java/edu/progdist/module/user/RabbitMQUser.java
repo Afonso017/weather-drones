@@ -19,7 +19,7 @@ public class RabbitMQUser {
     private final String host;
     private Connection connection;
 
-    private static final int HISTORY_LIMIT = 20;
+    private static final int HISTORY_LIMIT = 100;
 
     private record RabbitMqEvent(String routingKey, String message) {}
 
