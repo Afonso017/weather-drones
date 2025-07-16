@@ -5,8 +5,11 @@ import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Scanner;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.stream.Collectors;
 
 /**
  * Representa um usuário MQTT que se conecta a um broker e assina um tópico específico.
@@ -16,8 +19,14 @@ import java.util.concurrent.ConcurrentHashMap;
 public class MQTTUser {
     private MqttClient mqttClient;
 
+    // Define o número máximo de mensagens a serem mantidas no histórico por tópico.
+    private static final int HISTORY_LIMIT = 20;
+
+    private record MqttEvent(String topic, String content) {}
+    private static final Queue<MqttEvent> messageHistory = new ConcurrentLinkedQueue<>();
+
     // dados coletados para o dashboard
-    private static final Map<String, List<String>> receivedData = new ConcurrentHashMap<>();
+    private static Map<String, List<String>> receivedData = new ConcurrentHashMap<>();
 
     public MQTTUser(String broker, String topic) {
         try {
@@ -39,8 +48,20 @@ public class MQTTUser {
                     String content = String.format("Região %s: %s%n",
                         topic.substring(topic.lastIndexOf("/") + 1),
                         new String(message.getPayload()));
-                    receivedData.computeIfAbsent(topic, k -> new java.util.ArrayList<>()).add(content);
                     System.out.printf(content);
+
+                    messageHistory.add(new MqttEvent(topic, content));
+
+                    while (messageHistory.size() > HISTORY_LIMIT) {
+                        messageHistory.poll();
+                    }
+
+                    // Os eventos são agrupados pelo seu tópico.
+                    receivedData = messageHistory.stream()
+                            .collect(Collectors.groupingBy(
+                                    MqttEvent::topic,
+                                    Collectors.mapping(MqttEvent::content, Collectors.toList())
+                            ));
                 }
 
                 @Override
