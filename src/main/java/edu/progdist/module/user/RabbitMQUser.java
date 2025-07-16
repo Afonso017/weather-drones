@@ -6,11 +6,10 @@ import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.DeliverCallback;
 
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Scanner;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.stream.Collectors;
 
 /**
  * Representa um usuário que se conecta ao broker RabbitMQ do Gateway.
@@ -20,8 +19,14 @@ public class RabbitMQUser {
     private final String host;
     private Connection connection;
 
+    private static final int HISTORY_LIMIT = 100;
+
+    private record RabbitMqEvent(String routingKey, String message) {}
+
+    // histórico de dados
+    private static final Queue<RabbitMqEvent> messageHistory = new ConcurrentLinkedQueue<>();
     // dados coletados para o dashboard
-    private static final Map<String, List<String>> receivedData = new ConcurrentHashMap<>();
+    private static Map<String, List<String>> receivedData = new ConcurrentHashMap<>();
 
     public RabbitMQUser(String host) {
         this.host = host;
@@ -51,7 +56,21 @@ public class RabbitMQUser {
             DeliverCallback deliverCallback = (consumerTag, delivery) -> {
                 String message = new String(delivery.getBody(), StandardCharsets.UTF_8);
                 String region = delivery.getEnvelope().getRoutingKey();
-                receivedData.computeIfAbsent(region, k -> new ArrayList<>()).add(message);
+
+                // 2. Cria um evento e o adiciona à fila de histórico única.
+                messageHistory.add(new RabbitMqEvent(region, message));
+
+                // 3. Garante que a fila não exceda o limite.
+                while (messageHistory.size() > HISTORY_LIMIT) {
+                    messageHistory.poll();
+                }
+
+                // 4. Usa uma stream no histórico para reconstruir o mapa para o dashboard.
+                receivedData = messageHistory.stream()
+                        .collect(Collectors.groupingBy(
+                                RabbitMqEvent::routingKey,
+                                Collectors.mapping(RabbitMqEvent::message, Collectors.toList())
+                        ));
             };
 
             channel.basicConsume(queueName, true, deliverCallback, consumerTag -> {});
