@@ -54,16 +54,16 @@ public class MQTTUser {
 
                     messageHistory.add(new MqttEvent(topic, payload));
 
-                    while (messageHistory.size() > HISTORY_LIMIT) {
-                        messageHistory.poll();
+                    // exibe o histórico de mensagens a cada HISTORY_LIMIT mensagens recebidas
+                    if (messageHistory.size() % HISTORY_LIMIT == 0) {
+                        receivedData = messageHistory.stream()
+                            .collect(Collectors.groupingBy(
+                                MqttEvent::topic,
+                                Collectors.mapping(MqttEvent::content, Collectors.toList())
+                            ));
+                        Dashboard.display(receivedData);
+                        messageHistory.clear();
                     }
-
-                    // atualiza o mapa de dados coletados
-                    receivedData = messageHistory.stream()
-                        .collect(Collectors.groupingBy(
-                            MqttEvent::topic,
-                            Collectors.mapping(MqttEvent::content, Collectors.toList())
-                        ));
                 }
 
                 @Override
