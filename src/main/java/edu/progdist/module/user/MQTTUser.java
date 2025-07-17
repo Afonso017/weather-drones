@@ -45,23 +45,25 @@ public class MQTTUser {
                 // formata a mensagem recebida e a adiciona ao mapa de dados coletados
                 @Override
                 public void messageArrived(String topic, MqttMessage message) {
-                    String content = String.format("Região %s: %s%n",
-                        topic.substring(topic.lastIndexOf("/") + 1),
-                        new String(message.getPayload()));
-                    System.out.printf(content);
+                    String payload = new String(message.getPayload());
 
-                    messageHistory.add(new MqttEvent(topic, content));
+                    String formattedContent = String.format("Região %s: %s%n",
+                        topic.substring(topic.lastIndexOf("/") + 1),
+                        payload);
+                    System.out.printf(formattedContent);
+
+                    messageHistory.add(new MqttEvent(topic, payload));
 
                     while (messageHistory.size() > HISTORY_LIMIT) {
                         messageHistory.poll();
                     }
 
-                    // Os eventos são agrupados pelo seu tópico.
+                    // atualiza o mapa de dados coletados
                     receivedData = messageHistory.stream()
-                            .collect(Collectors.groupingBy(
-                                    MqttEvent::topic,
-                                    Collectors.mapping(MqttEvent::content, Collectors.toList())
-                            ));
+                        .collect(Collectors.groupingBy(
+                            MqttEvent::topic,
+                            Collectors.mapping(MqttEvent::content, Collectors.toList())
+                        ));
                 }
 
                 @Override

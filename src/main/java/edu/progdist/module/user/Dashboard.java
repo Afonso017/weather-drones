@@ -58,10 +58,12 @@ public class Dashboard {
                     .average().orElse(0.0)
             ));
 
-        // calcula o total das médias
-        double totalAverageSum = averageByRegion.values().stream().mapToDouble(Double::doubleValue).sum();
+        // calcula o total das médias usando o valor absoluto
+        double totalMagnitudeSum = averageByRegion.values().stream()
+            .mapToDouble(Math::abs)
+            .sum();
 
-        if (totalAverageSum == 0) {
+        if (totalMagnitudeSum == 0) {
             System.out.println("\t- Dados insuficientes para análise.");
             return;
         }
@@ -70,7 +72,7 @@ public class Dashboard {
         averageByRegion.entrySet().stream()
             .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
             .forEach(entry -> {
-                double percentage = (entry.getValue() / totalAverageSum) * 100.0;
+                double percentage = (Math.abs(entry.getValue()) / totalMagnitudeSum) * 100.0;
                 System.out.printf("\t>> %-8s: %.2f%% (média: %.2f)%n", entry.getKey(), percentage, entry.getValue());
             });
     }
