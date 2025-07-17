@@ -24,6 +24,8 @@ public class Gateway {
     private Connection rabbitConnection;
     private Channel rabbitChannel;
 
+    public static final String BROKER_MQTT = "tcp://test.mosquitto.org:1883";
+
     private static final String RABBITMQ_EXCHANGE = "weather_data";
     private static final String MQTT_PRODUCER_TOPIC_PREFIX = "data/realtime/";
 
@@ -152,9 +154,8 @@ public class Gateway {
 
     public static void main(String[] args) {
         try {
-            final String mqttBroker = "tcp://broker.emqx.io:1883";
             final String rabbitMqHost = "localhost";
-            Gateway gateway = new Gateway(mqttBroker, rabbitMqHost);
+            Gateway gateway = new Gateway(BROKER_MQTT, rabbitMqHost);
 
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {

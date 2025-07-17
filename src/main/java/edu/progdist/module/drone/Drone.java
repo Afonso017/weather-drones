@@ -11,6 +11,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function; // <-- MUDANÇA IMPORTANTE
 
+import static edu.progdist.module.Gateway.BROKER_MQTT;
+
 /**
  * Representa um drone que coleta dados ambientais e os envia para um broker MQTT.
  * O drone é configurado com uma região específica e envia dados formatados periodicamente.
@@ -89,8 +91,6 @@ public class Drone {
             region = args[0].toLowerCase();
         }
 
-        final String mqttBroker = "tcp://broker.emqx.io:1883";
-
         Map<String, Function<EnviromentData, String>> formatters = Map.of(
             "norte", EnviromentData::toNorthFormat,
             "sul", EnviromentData::toSouthFormat,
@@ -104,7 +104,7 @@ public class Drone {
             return;
         }
 
-        Drone drone = new Drone(region, mqttBroker, formatter);
+        Drone drone = new Drone(region, BROKER_MQTT, formatter);
 
         Runtime.getRuntime().addShutdownHook(new Thread(drone::stop));
     }

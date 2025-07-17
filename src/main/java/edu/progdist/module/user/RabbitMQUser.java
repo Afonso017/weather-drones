@@ -57,15 +57,12 @@ public class RabbitMQUser {
                 String message = new String(delivery.getBody(), StandardCharsets.UTF_8);
                 String region = delivery.getEnvelope().getRoutingKey();
 
-                // 2. Cria um evento e o adiciona à fila de histórico única.
                 messageHistory.add(new RabbitMqEvent(region, message));
 
-                // 3. Garante que a fila não exceda o limite.
                 while (messageHistory.size() > HISTORY_LIMIT) {
                     messageHistory.poll();
                 }
 
-                // 4. Usa uma stream no histórico para reconstruir o mapa para o dashboard.
                 receivedData = messageHistory.stream()
                         .collect(Collectors.groupingBy(
                                 RabbitMqEvent::routingKey,

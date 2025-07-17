@@ -11,6 +11,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.Collectors;
 
+import static edu.progdist.module.Gateway.BROKER_MQTT;
+
 /**
  * Representa um usuário MQTT que se conecta a um broker e assina um tópico específico.
  * Recebe mensagens publicadas nesse tópico e as exibe no console, além de armazenar os dados recebidos
@@ -99,8 +101,7 @@ public class MQTTUser {
             topic = args[0];
         }
 
-        final String mqttBroker = "tcp://broker.emqx.io:1883";
-        MQTTUser user = new MQTTUser(mqttBroker, topic);
+        MQTTUser user = new MQTTUser(BROKER_MQTT, topic);
 
         // adiciona um shutdown hook para garantir que o usuário seja desconectado corretamente
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
