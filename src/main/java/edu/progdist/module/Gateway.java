@@ -18,7 +18,7 @@ import java.util.concurrent.Executors;
 public class Gateway {
     private static final String PREFIX = "[GATEWAY] ";
     private final Database database = new Database();
-    private final ExecutorService executor = Executors.newFixedThreadPool(10);
+    private final ExecutorService executor = Executors.newCachedThreadPool();
     private MqttClient mqttConsumer;
     private MqttClient mqttProducer;
     private Connection rabbitConnection;
