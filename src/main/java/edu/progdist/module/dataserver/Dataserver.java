@@ -1,10 +1,10 @@
 package edu.progdist.module.dataserver;
 
 import com.sun.management.OperatingSystemMXBean;
-import edu.progdist.connection.Message;
-import edu.progdist.connection.MulticastConnection;
-import edu.progdist.connection.Server;
-import edu.progdist.connection.TcpConnection;
+import edu.progdist.connection.direct.Message;
+import edu.progdist.connection.direct.MulticastConnection;
+import edu.progdist.connection.direct.Server;
+import edu.progdist.connection.direct.TcpConnection;
 
 import java.io.IOException;
 import java.lang.management.ManagementFactory;

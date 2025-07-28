@@ -1,8 +1,8 @@
 package edu.progdist.module.user;
 
-import edu.progdist.connection.Message;
-import edu.progdist.connection.Server;
-import edu.progdist.connection.TcpConnection;
+import edu.progdist.connection.direct.Message;
+import edu.progdist.connection.direct.Server;
+import edu.progdist.connection.direct.TcpConnection;
 
 import java.io.IOException;
 import java.util.Scanner;
@@ -13,11 +13,11 @@ import java.util.concurrent.TimeUnit;
 /**
  * Abstrai as funcionalidades de um usuário.
  */
-class User {
+class TCPUser {
     private TcpConnection tcpConnection;
     private final ScheduledExecutorService scheduler;
 
-    public User(String host, int port) {
+    public TCPUser(String host, int port) {
         scheduler = Executors.newScheduledThreadPool(1);
         try {
             this.tcpConnection = new TcpConnection(host, port);
@@ -62,11 +62,6 @@ class User {
                 // recebe a resposta do servidor
                 Message dataResponse = tcpConnection.receive();
 
-                if (dataResponse.payload() == null || dataResponse.payload().isEmpty()) {
-                    System.out.println("Nenhum dado recebido do servidor.");
-                    return;
-                }
-
                 if (dataResponse.type().equals("GET_RESPONSE")) {
                     System.out.println("\n\n\nDados climáticos recebidos:");
                     for (String line : dataResponse.payload().split(" ")) {
@@ -95,6 +90,6 @@ class User {
         System.out.println("Digite o endereço do datacenter (formato: host:port):");
 
         Server.Host datacenterHost = new Server.Host(scanner.nextLine());
-        new User(datacenterHost.host, datacenterHost.port);
+        new TCPUser(datacenterHost.host, datacenterHost.port);
     }
 }
